@@ -1,0 +1,95 @@
+---
+# tasks file for nexus
+- name: update all
+  yum:
+    name: "*"
+    state: latest 
+
+- name: install java
+  yum:
+    name: java-1.8.0-openjdk.x86_64
+    state: installed 
+  
+- name: create app directory
+  file:
+    path: /app
+    state: directory
+
+- name: download nexus
+  get_url:
+    url: https://download.sonatype.com/nexus/3/latest-unix.tar.gz
+    dest: /app/nexus.tar.gz 
+
+- name: extract tar file 
+  unarchive:
+    src: /app/nexus.tar.gz
+    dest: /app/
+    remote_src: yes
+
+- name: change untared name
+  copy:
+    remote_src: yes
+    src: /app/nexus-3.22.0-02/
+    dest: /app/nexus
+
+- name: create user
+  user:
+    name: nexus
+  
+- name: create group
+  group: 
+    name: nexus
+
+
+- name: change nexus dir owner  
+  file:
+    path: /app/nexus
+    owner: nexus
+    group: nexus
+
+
+- name: change nexus dir owner  
+  file:
+    path: /app/sonatype-work
+    owner: nexus
+    group: nexus
+
+- name: uncomment line
+  replace:
+    path: /app/nexus/bin/nexus.rc
+    regexp: '#run_as_user="nexus"'
+    replace: 'run_as_user="nexus"'
+
+- name: create unit file
+  file:
+    path: /etc/systemd/system/nexus.service
+    state: touch
+    
+- name: create unit file 
+  blockinfile:
+    path: /etc/systemd/system/nexus.service
+    block: |
+      [Unit]
+      Description=nexus service
+      After=network.target
+
+      [Service]
+      Type=forking
+      LimitNOFILE=65536
+      User=nexus
+      Group=nexus
+      ExecStart=/app/nexus/bin/nexus start
+      ExecStop=/app/nexus/bin/nexus stop
+      User=nexus
+      Restart=on-abort
+
+      [Install]
+      WantedBy=multi-user.target
+
+- name: add nexus service to boot
+  command: chkconfig nexus on
+
+- name: start nexus
+  service:
+    name: nexus
+    state: started
